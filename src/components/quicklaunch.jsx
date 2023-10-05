@@ -9,7 +9,7 @@ import { SettingsContext } from "utils/contexts/settings";
 export default function QuickLaunch({servicesAndBookmarks, searchString, setSearchString, isOpen, close, searchProvider}) {
   const { t } = useTranslation();
   const { settings } = useContext(SettingsContext);
-  const { searchDescriptions, hideVisitURL } = settings?.quicklaunch ? settings.quicklaunch : { searchDescriptions: false, hideVisitURL: false };
+  const { searchDescriptions, searchTags, hideVisitURL } = settings?.quicklaunch ? settings.quicklaunch : { searchDescriptions: false, searchTags: false,hideVisitURL: false };
 
   const searchField = useRef();
 
@@ -85,15 +85,32 @@ export default function QuickLaunch({servicesAndBookmarks, searchString, setSear
     else {
       let newResults = servicesAndBookmarks.filter(r => {
         const nameMatch = r.name.toLowerCase().includes(searchString);
+        
         let descriptionMatch;
         if (searchDescriptions) {
           descriptionMatch = r.description?.toLowerCase().includes(searchString)
           r.priority = nameMatch ? 2 * (+nameMatch) : +descriptionMatch; // eslint-disable-line no-param-reassign
         }
-        return nameMatch || descriptionMatch;
+				
+        let tagsMatch;
+				if (searchTags) {				    
+					tagsMatch = r.tags?.map(tag => tag.toLowerCase()).includes(searchString)
+					if (nameMatch) {
+						r.priority =  4 * (+nameMatch);
+					} else if (descriptionMatch) {
+						r.priority =  2 * (+descriptionMatch);
+					} else {
+						r.priority =  tagsMatch;
+					}
+				}
+        return nameMatch || descriptionMatch || tagsMatch;
       });
 
       if (searchDescriptions) {
+        newResults = newResults.sort((a, b) => b.priority - a.priority);
+      }
+
+      if (searchTags) {
         newResults = newResults.sort((a, b) => b.priority - a.priority);
       }
 
@@ -123,7 +140,7 @@ export default function QuickLaunch({servicesAndBookmarks, searchString, setSear
         setCurrentItemIndex(0);
       }
     }
-  }, [searchString, servicesAndBookmarks, searchDescriptions, hideVisitURL, searchProvider, url, t]);
+  }, [searchString, servicesAndBookmarks, searchDescriptions, searchTags, hideVisitURL, searchProvider, url, t]);
 
 
   const [hidden, setHidden] = useState(true);
@@ -187,8 +204,16 @@ export default function QuickLaunch({servicesAndBookmarks, searchString, setSear
                             {searchDescriptions && r.priority < 2 ? highlightText(r.description) : r.description}
                           </span>
                         }
+                        {r.tags &&
+                          <span className="text-xs text-theme-600 text-light">
+                            {searchTags && r.priority < 4 ? highlightText("Tag Match")}
+                          </span>
+                        }                        
                       </div>
                     </div>
+                    {r.tags &&
+                    <div className="text-xs text-theme-600 font-bold pointer-events-none">{searchTags && r.priority < 4 ? highlightText("Tag Match")}</div>
+                    }
                     <div className="text-xs text-theme-600 font-bold pointer-events-none">{t(`quicklaunch.${r.type ? r.type.toLowerCase() : 'bookmark'}`)}</div>
                   </button>
                 </li>
